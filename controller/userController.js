@@ -56,7 +56,7 @@ const chkUserForLogin = async(req , res) => {
             JSON.stringify(users.user)
         )
         res.cookie('jwt', refreshToken , { httpOnly :true , sameSite :'None' ,secure : true , maxAge : 24 *60 * 60 * 1000}); // cookie one day    
-        res.json({users:userUpdate.username , roles:userUpdate.roles , accessToken:accessToken ,"code": 1})
+        res.json({userid:userUpdate.id,users:userUpdate.username , roles:userUpdate.roles , accessToken:accessToken ,"code": 1})
 
     }else{
         res.json({"message" : "password invalid" , "code" :3})
@@ -65,7 +65,7 @@ const chkUserForLogin = async(req , res) => {
 }
 
 const userRegister = async (req ,res) => {
-
+    
     const userRegister = req.body.username;
     const passwordRegister = req.body.password;
     const userEmail = req.body.email;
@@ -73,10 +73,11 @@ const userRegister = async (req ,res) => {
     if(checSameUser !== undefined) return res.json({code:2 , text:"usersame"});
     const passBcypt = bcrypt.hashSync(passwordRegister , 10);
     const Registertime =  `${format(new Date() , 'yyyyMMdd_HH:mm:ss')}`;
+    const createdate =  `${format(new Date() , 'MMMM dd ,yyyy pp')}`;
     
     const userId = users.user.length > 0 ? users.user.length+1 : 0;
 
-    const newUser = {id:userId , username:userRegister , password:passBcypt , roles:{"User":2001} , registerTime: Registertime};
+    const newUser = {id:userId , username:userRegister , password:passBcypt , roles:{"User":2001} , registerTime: Registertime , date:createdate};
 
     
     const userInfo = {userid:userId ,username : userRegister , profile :{ nameSurname:null,pfPhone:null,pfEmail:userEmail,pfGender:null,pfBirth:null} , address:[]};
@@ -119,7 +120,7 @@ const userRegister = async (req ,res) => {
                               )                           
 
 
-    res.json({code:1 , "text":"register success"});
+    res.json({code:1 , "text":"register success" , userid:userId});
     
 }
 
@@ -136,6 +137,17 @@ const userProfile = (req ,res) => {
     res.json(usersProfile.userprofile);
 
 } 
+const userProfileByID = (req ,res) => {
+
+    const ids = req.params.id;
+    const findProfile = usersProfile.userprofile.find((user) => user.userid === Number(ids))
+    if(findProfile === undefined) return res.json({code: 6 ,msg:"user not found"})
+    const findsStatus = findProfile.address.find((item) => item.active === true)
+    if(findsStatus === undefined) return res.json({code: 6 ,msg:"data not found"})
+    res.json({code :1 , list:findsStatus})
+  
+} 
+
 
 const userLogout = async(req , res) => {
 
@@ -169,4 +181,4 @@ const userLogout = async(req , res) => {
     //res.sendStatus(204);
 }
 
-module.exports = {chkUserForLogin , getUser , userLogout , userRegister , userProfile}
+module.exports = {chkUserForLogin , getUser , userLogout , userRegister , userProfile , userProfileByID}

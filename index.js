@@ -15,8 +15,16 @@ const EventEmitter = require('events');
 class MyEmitter extends EventEmitter {};
 const myemitter = new MyEmitter();
 const multer = require('multer');
+const fsPromises = require('fs').promises;
 const path = require('path');
-
+const messageuser = {
+    message : require('./model/messageuser.json'),
+    setMessageUser : function (data) { this.message = data }
+};
+const messageadmin = {
+    message : require('./model/message.json'),
+    setMessage : function (data) { this.message = data }
+};
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -82,6 +90,113 @@ app.get('/', (req, res) => {
     res.json({server:"server running"})
 })
 
+const io = require('socket.io')(server , {
+    cors : {origin: "http://localhost:3002", methods: ["GET", "POST"] , credentials: true}
+});
+
+io.on('connection', (socket) => {
+
+    console.log(`socket connect`)
+
+    socket.emit('connect-success' , {msg : `connect socket` ,socketid:socket.id , status : 1})
+
+    //socket.emit('connect-dashboard-success' , {msg : `connect dashboard socket` ,socketid:socket.id , status : 1})
+
+    socket.on('chat-message-from-user', async (message, callback) => {
+
+        var reNewMsg = [];
+        var newmap = [];
+
+        messageuser.setMessageUser([...messageuser.message , message]);
+
+        await fsPromises.writeFile(
+            path.join(__dirname , '.' , 'model' , 'messageuser.json'),
+            JSON.stringify(messageuser.message)
+        )
+
+        socket.emit('response-message-from-user', message);
+
+        for(var i = 0 ; i < messageuser.message.length; i++)
+        {
+           
+           if(messageuser.message[i].id === message.id && messageuser.message[i].status === "unread"){
+               
+                //console.log(messageuser.message[i])
+               
+                newmap.push(messageuser.message[i])
+
+           }
+
+       }
+       //console.log(newmap.length)
+       reNewMsg = newmap.length;
+       //console.log(reNewMsg)
+
+       message["number"] = reNewMsg;
+       message["socketid"] = socket.id;
+       //console.log(message)
+       //io.emit('list-message-broadcast-admin', message); //ส่งไปที่หน้า chat admin// อันนี้ทำงานจะส่งข้อมูลกลับไปที่ client ที่ร้องขอ
+       socket.broadcast.emit("list-message-broadcast-admin", message); // อันนี้จะทำงาน ทุก client ที่เปิดโปรแกรมไว้
+
+        callback("ok");
+    });
+
+    socket.on('chat-message-from-admin', async (message, callback) => {
+
+        //console.log(message.msgin.id)
+
+        message.msgin.id = messageadmin.message.length+1;
+
+        messageadmin.setMessage([...messageadmin.message , message.msgin]);
+
+        await fsPromises.writeFile(
+           path.join(__dirname , '.' , 'model' , 'message.json'),
+           JSON.stringify(messageadmin.message)
+        )
+
+       message.msg["socketid"]  = socket.id;
+
+       io.emit('message-from-admin', message.msg); // io ส่งข้อมูลกลับไปที่ 
+       
+
+       //ถ้าใช้ io จะส่งข้อมูลกลับไปที่ client ที่เปิด โปรแกรมอยู่ทั้งหมด แต่ถ้าใช้ socket จะส่งข้อมูลกลับไปที่ client ที่ร้องขอเท่านั้น
+       socket.emit('result-message-admin', message.msg); // อันนี้ทำงานจะส่งข้อมูลกลับไปที่ client ที่ร้องขอ
+       //io.emit('list-message', message.msg); // อันนี้ทำงานจะส่งข้อมูลกลับไปที่ client ที่ร้องขอ
+
+       //socket.broadcast.emit("list-message",{message:message.name,list_message:arr2}); // อันนี้จะทำงาน ทุก client ที่เปิดโปรแกรมไว้
+       
+       callback("ok");
+   });
+   socket.on('register-new-member', async (message, callback) => {
+
+    let userID = message.userID;
+    let username = message.username;
+    let msg = message.msg;
+    let dates = message.date;
+    let registerDate = message.regisDate;
+    
+    const newObj = {id:messageadmin.message.length > 0 ? messageadmin.message[messageadmin.message.length-1].id + 1  : 1
+        ,username:"admin"
+        ,msg
+        ,"userId":userID.toString()
+        ,"date":registerDate}
+
+     messageadmin.setMessage([...messageadmin.message ,newObj]);
+
+    await fsPromises.writeFile(
+        path.join(__dirname , '.' , 'model' , 'message.json') , 
+        JSON.stringify(messageadmin.message)
+    )
+
+    var callbackData = {'userId':userID , username ,'date':dates, status : 0}
+
+    socket.broadcast.emit("callback-register-new-member",callbackData);
+
+    callback("ok");
+    
+    });
+
+})
 
 
 app.use('/upload', upload.single('file'), require('./routes/uploadimgcate'))
@@ -91,6 +206,12 @@ app.use('/uploadproduct', multi_upload.array('file') , require('./routes/uploadp
 app.use('/uploads', express.static(path.join(__dirname,'public','uploads'))) /**หากต้องการ referrance file ต้องทำ static path ก่อนไม่งั้นจะไม่สามารถเห็น file รูปได้ */
 
 app.use('/uploadsproduct', express.static(path.join(__dirname ,'public','imgprd')))
+
+app.use('/checkout', require('./routes/checkout'));
+
+app.use('/shipping', require('./routes/shipping'));
+
+app.use('/message', require('./routes/messagedata'));
 
 app.use("/sizeproduct", require("./routes/sizeProduct"));
 

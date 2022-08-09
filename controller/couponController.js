@@ -53,6 +53,25 @@ const getCouponAll = (req , res) =>{
     res.json({code:1, msg:"success" , list:data});
 
 }
+const chkCoupon = (req , res) => {
+
+    const reqParam = req.params.id;
+    const findcou = coupon.detail.find((data) => data.codecoupon === reqParam)
+    if(findcou === undefined) return res.json({code:6 , msg:"coupon not found"});
+    if(findcou.status !== true){
+        return res.json({code:7 , msg:"coupon expire"});
+    }
+    else if(Number(findcou.limitcoupon) === 0){
+
+        return res.json({code:8 , msg:"coupon limit"});
+    }
+    
+    else{
+
+        res.json({code:1 , list:findcou});
+    }
+
+}
 const updateCoupon = async (req , res) => {
     
     if(typeof req.body && req.body.id !== "")
@@ -99,4 +118,4 @@ const delCoupon = async (req , res) => {
 
 }
 
-module.exports = {addCoupon , getCouponByID , getCouponAll , updateCoupon , delCoupon}
+module.exports = {addCoupon , getCouponByID , getCouponAll , updateCoupon , delCoupon , chkCoupon}

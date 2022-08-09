@@ -107,5 +107,63 @@ const delBlog = async (req ,res) => {
 
 
 }
+const getBlogforFrontend = (req , res) =>{
 
-module.exports = {addBlogs , getBlogs , getBlogByID , updateBlog ,delBlog}
+    const idd = req.params.id;
+    const category = require('../model/category.json');
+    const tags = require('../model/tags.json');
+    let tagslist = "";
+    const findBlog = blogs.detail.find((list) => list.id === Number(idd));
+    if(findBlog === undefined) return res.json({code:6 , msg:"no data"});
+    const findCate = category.find((data) => data.id  === findBlog.cateid);
+    
+    for (const [key, value] of Object.entries(tags)) {
+
+         if(findBlog.tag.indexOf(value.id) >-1){
+
+             tagslist += value["tagname"] + ",";
+         }
+           
+       
+    }
+    let tagslice = tagslist.slice(0, tagslist.length-1);
+    findBlog["catename"] = findCate.catename;
+    findBlog["taglist"] = tagslice;
+
+    //console.log(findBlog)
+
+    res.json({code:1 , list:findBlog , blogall:blogs.detail});
+
+} 
+const getBlogForSlug = (req , res) => {
+
+    const slugs = req.params.id;
+    const category = require('../model/category.json');
+    const findCate = category.find((cate) => cate.catename ===  slugs.trim());
+    if(findCate === undefined) return res.json({code:6 , msg:"no data"});
+    const filterData = blogs.detail.filter((item) => item.cateid ===  findCate.id);
+
+    res.json({code:1 , list:filterData});
+    
+}
+
+const getTagGroup = (req ,res) => {
+    const tagslug = req.params.slug;
+    const tag = require('../model/tags.json');
+    const findTag = tag.find((items) => items.tagname === tagslug.trim())
+    var listBlog = [];
+    //console.log(findTag)
+    if(findTag === undefined) return res.json({code:6 , msg:"no data"});
+    for(const [key , val] of Object.entries(blogs.detail)){
+
+        //console.log("taglist " + val["tag"] , " " , findTag.id)
+        if(val["tag"].indexOf(findTag.id) >-1){
+                listBlog.push(val)
+             //console.log("blog = "+val["id"]);
+        }
+    }
+     res.json({code:1 , list:listBlog})
+ }
+
+
+module.exports = {addBlogs , getBlogs , getBlogByID , updateBlog ,delBlog , getBlogforFrontend , getBlogForSlug , getTagGroup}
